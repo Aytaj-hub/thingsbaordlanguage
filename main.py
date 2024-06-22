@@ -85,11 +85,11 @@ def write_json(data, filename):
     with open(filename, 'w', encoding='utf-8') as file:
         json.dump(data, file, ensure_ascii=False, indent=4)
 
-api_key = "016e85a9-f593-4f23-82bb-aed2fb5e8f33:fx"  # Replace this with your actual DeepL API key
+api_key = "a69c7cb4-157e-4ee7-9ccc-49a54d6971de:fx"  # Replace this with your actual DeepL API key
 original_json_file = "locale.constant-en_US.json"  # Adjust the file name/path as needed
 
 # Define the list of languages to translate into
-languages = ["NB", "RU", "SK", "SV"]
+languages = ["SK", "SV"]
 
 # Read the original JSON data
 data = read_json(original_json_file)
