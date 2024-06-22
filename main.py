@@ -3,7 +3,6 @@ import requests
 from html.parser import HTMLParser
 
 class HTMLTextExtractor(HTMLParser):
-    """Extracts text from HTML content, leaving tags intact."""
     def __init__(self):
         super().__init__()
         self.text_parts = []
@@ -13,21 +12,20 @@ class HTMLTextExtractor(HTMLParser):
         self.text_parts.append(data)
 
     def handle_starttag(self, tag, attrs):
-        if tag in ["br", "img", "hr"]:  # Add any other self-closing tags here
+        if tag in ["br", "img", "hr"]:
             self.text_parts.append(f"<{tag}/>")
         else:
             self.text_parts.append(f"<{tag}>")
             self.last_tag = tag
 
     def handle_endtag(self, tag):
-        if tag not in ["br", "img", "hr"]:  # Ensure self-closing tags are not closed again
+        if tag not in ["br", "img", "hr"]:
             self.text_parts.append(f"</{tag}>")
 
     def get_data(self):
         return ''.join(self.text_parts)
 
-def translate_text(text, api_key):
-    """Translate text using the DeepL API."""
+def translate_text(text, api_key, target_lang):
     url = "https://api-free.deepl.com/v2/translate"
     headers = {
         "Content-Type": "application/x-www-form-urlencoded",
@@ -35,34 +33,32 @@ def translate_text(text, api_key):
     }
     data = {
         "text": text,
-        "target_lang": "FI"
+        "target_lang": target_lang
     }
     response = requests.post(url, headers=headers, data=data)
     return response.json()['translations'][0]['text']
 
-def translate_html_safe(text, api_key):
-    """Translate text but preserve HTML tags."""
+def translate_html_safe(text, api_key, target_lang):
     parser = HTMLTextExtractor()
     parser.feed(text)
     text_parts = parser.text_parts
     translated_parts = []
     for part in text_parts:
-        if '<' in part:  # This is a tag, not translatable text
+        if '<' in part:
             translated_parts.append(part)
         else:
-            translated_parts.append(translate_text(part, api_key))
+            translated_parts.append(translate_text(part, api_key, target_lang))
     return ''.join(translated_parts)
 
-def translate_json_values(json_data, api_key, total_elements, translated_elements, last_reported_progress):
-    """Recursively translate all string values in JSON data, preserving HTML."""
+def translate_json_values(json_data, api_key, target_lang, total_elements, translated_elements, last_reported_progress):
     if isinstance(json_data, dict):
         for key, value in json_data.items():
-            json_data[key], total_elements, translated_elements, last_reported_progress = translate_json_values(value, api_key, total_elements, translated_elements, last_reported_progress)
+            json_data[key], total_elements, translated_elements, last_reported_progress = translate_json_values(value, api_key, target_lang, total_elements, translated_elements, last_reported_progress)
     elif isinstance(json_data, list):
         for index, item in enumerate(json_data):
-            json_data[index], total_elements, translated_elements, last_reported_progress = translate_json_values(item, api_key, total_elements, translated_elements, last_reported_progress)
+            json_data[index], total_elements, translated_elements, last_reported_progress = translate_json_values(item, api_key, target_lang, total_elements, translated_elements, last_reported_progress)
     elif isinstance(json_data, str):
-        translated_data = translate_html_safe(json_data, api_key)
+        translated_data = translate_html_safe(json_data, api_key, target_lang)
         translated_elements += 1
         progress = (translated_elements / total_elements) * 100
         if progress - last_reported_progress >= 10:
@@ -72,7 +68,6 @@ def translate_json_values(json_data, api_key, total_elements, translated_element
     return json_data, total_elements, translated_elements, last_reported_progress
 
 def count_elements(json_data):
-    """Count the total number of string elements in JSON data."""
     if isinstance(json_data, dict):
         return sum(count_elements(value) for value in json_data.values())
     elif isinstance(json_data, list):
@@ -82,31 +77,27 @@ def count_elements(json_data):
     return 0
 
 def read_json(filename):
-    """Read a JSON file and return the data."""
     with open(filename, 'r', encoding='utf-8') as file:
         data = json.load(file)
     return data
 
 def write_json(data, filename):
-    """Write data to a JSON file."""
     with open(filename, 'w', encoding='utf-8') as file:
         json.dump(data, file, ensure_ascii=False, indent=4)
 
-# Usage example:
-api_key = "3f088c02-2a5e-42a3-b795-2a166186b96a:fx"  # Replace this with your actual DeepL API key
+api_key = "016e85a9-f593-4f23-82bb-aed2fb5e8f33:fx"  # Replace this with your actual DeepL API key
 original_json_file = "locale.constant-en_US.json"  # Adjust the file name/path as needed
-translated_json_file = "locale.constant-fi_FI.json"  # Output file name
+
+# Define the list of languages to translate into
+languages = ["NB", "RU", "SK", "SV"]
 
 # Read the original JSON data
 data = read_json(original_json_file)
 
-# Count total elements to be translated
-total_elements = count_elements(data)
-
-# Translate the JSON values
-translated_data, _, _, _ = translate_json_values(data, api_key, total_elements, 0, 0)
-
-# Write the translated JSON back to a file
-write_json(translated_data, translated_json_file)
-
-print("Translation completed and saved to:", translated_json_file)
+# Translate and save for each language
+for lang in languages:
+    total_elements = count_elements(data)
+    translated_data, _, _, _ = translate_json_values(data, api_key, lang, total_elements, 0, 0)
+    translated_json_file = f"locale.constant-{lang}.json"
+    write_json(translated_data, translated_json_file)
+    print("Translation completed and saved to:", translated_json_file)
